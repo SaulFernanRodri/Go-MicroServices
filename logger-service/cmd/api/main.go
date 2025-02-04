@@ -51,7 +51,7 @@ func main() {
 	}
 
 	go app.rpcListen()
-	
+
 	// start web server
 	log.Println("Starting service on port", webPort)
 	srv := &http.Server{

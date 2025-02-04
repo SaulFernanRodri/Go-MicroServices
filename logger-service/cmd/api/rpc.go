@@ -18,7 +18,7 @@ type RPCPayload struct {
 }
 
 // LogInfo writes our payload to mongo
-func (r *RPCServer) LogInfo(payload RPCPayload, resp *string) error {
+func (r *RPCServer) LogInfo(payload *RPCPayload, resp *string) error {
 	collection := client.Database("logs").Collection("logs")
 	_, err := collection.InsertOne(context.TODO(), data.LogEntry{
 		Name:      payload.Name,
