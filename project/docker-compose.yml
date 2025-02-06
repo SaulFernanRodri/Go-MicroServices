@@ -41,8 +41,6 @@ services:
       MAIL_ENCRYPTION: none
       MAIL_USERNAME: ""
       MAIL_PASSWORD: ""
-      FROM_NAME: "John Smith"
-      FROM_ADDRESS: john.smith@example.com
     networks:
       - app_network
 

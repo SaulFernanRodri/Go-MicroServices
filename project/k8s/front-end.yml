@@ -26,7 +26,7 @@ spec:
           - name: BROKER_URL
             value: "http://broker-service.info"
         ports:
-          - containerPort: 8081
+          - containerPort: 8082
 
 ---
 
@@ -37,8 +37,10 @@ metadata:
 spec:
   selector:
     app: front-end
+  type: NodePort
   ports:
     - protocol: TCP
       name: main-port
-      port: 8081
-      targetPort: 8081
+      port: 8082
+      targetPort: 8082
+      nodePort: 30082
