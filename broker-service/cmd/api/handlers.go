@@ -259,10 +259,7 @@ func (app *Config) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
 		return
 	}
 
-	rpcPayload := RPCPayload{
-		Name: l.Name,
-		Data: l.Data,
-	}
+	rpcPayload := RPCPayload(l)
 
 	var result string
 	err = client.Call("RPCServer.LogInfo", &rpcPayload, &result)
