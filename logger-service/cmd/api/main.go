@@ -50,8 +50,23 @@ func main() {
 		Models: data.New(client),
 	}
 
-	go app.rpcListen()
-	go app.gRPCListen()
+	go func() {
+		// start RPC server
+		log.Println("Starting RPC server on port", rpcPort)
+		err := app.rpcListen()
+		if err != nil {
+			log.Println("Error starting RPC server:", err)
+		}
+	}()
+	go func() {
+		// start gRPC server
+		log.Println("Starting gRPC server on port", gRpcPort)
+		app.gRPCListen()
+		if err != nil {
+			log.Println("Error starting gRPC server:", err)
+		}
+
+	}()
 
 	// start web server
 	log.Println("Starting service on port", webPort)
@@ -82,7 +97,11 @@ func (app *Config) rpcListen() error {
 		return err
 	}
 
-	defer listen.Close()
+	defer func() {
+		if err := listen.Close(); err != nil {
+			log.Println("Error closing listener:", err)
+		}
+	}()
 
 	for {
 		rpcConn, err := listen.Accept()

@@ -37,8 +37,8 @@ func (l *LogEntry) Insert(entry LogEntry) error {
 	collection := client.Database("logs").Collection("logs")
 
 	_, err := collection.InsertOne(context.TODO(), LogEntry{
-		Name: entry.Name,
-		Data: entry.Data,
+		Name:      entry.Name,
+		Data:      entry.Data,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	})
@@ -57,14 +57,19 @@ func (l *LogEntry) All() ([]*LogEntry, error) {
 	collection := client.Database("logs").Collection("logs")
 
 	opts := options.Find()
-	opts.SetSort(bson.D{{"created_at", -1}})
+	opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
 
 	cursor, err := collection.Find(context.TODO(), bson.D{}, opts)
 	if err != nil {
 		log.Println("Finding all docs error:", err)
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			log.Println("Error closing cursor:", err)
+		}
+	}()
 
 	var logs []*LogEntry
 
@@ -131,10 +136,10 @@ func (l *LogEntry) Update() (*mongo.UpdateResult, error) {
 		ctx,
 		bson.M{"_id": docID},
 		bson.D{
-			{"$set", bson.D{
-				{"name", l.Name},
-				{"data", l.Data},
-				{"updated_at", time.Now()},
+			{Key: "$set", Value: bson.D{
+				{Key: "name", Value: l.Name},
+				{Key: "data", Value: l.Data},
+				{Key: "updated_at", Value: time.Now()},
 			}},
 		},
 	)

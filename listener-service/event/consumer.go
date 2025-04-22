@@ -12,7 +12,6 @@ import (
 
 type Consumer struct {
 	conn *amqp.Connection
-	queueName string
 }
 
 func NewConsumer(conn *amqp.Connection) (Consumer, error) {
@@ -47,7 +46,11 @@ func (consumer *Consumer) Listen(topics []string) error {
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			log.Println("Error closing channel", err)
+		}
+	}()
 
 	q, err := declareRandomQueue(ch)
 	if err != nil {
@@ -55,7 +58,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 	}
 
 	for _, s := range topics {
-		ch.QueueBind(
+		err := ch.QueueBind(
 			q.Name,
 			s,
 			"logs_topic",
@@ -129,11 +132,15 @@ func logEvent(entry Payload) error {
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Println("Error closing response body", err)
+		}
+	}()
 
 	if response.StatusCode != http.StatusAccepted {
 		return err
 	}
-	
+
 	return nil
 }

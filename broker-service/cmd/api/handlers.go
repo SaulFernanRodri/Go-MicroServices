@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/rpc"
 	"time"
@@ -50,7 +51,9 @@ func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
 		Message: "Hit the broker",
 	}
 
-	_ = app.writeJSON(w, http.StatusOK, payload)
+	if err := app.writeJSON(w, http.StatusOK, payload); err != nil {
+		return
+	}
 }
 
 // HandleSubmission is the main point of entry into the broker. It accepts a JSON
@@ -60,19 +63,28 @@ func (app *Config) HandleSubmission(w http.ResponseWriter, r *http.Request) {
 
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	switch requestPayload.Action {
 	case "auth":
 		app.authenticate(w, requestPayload.Auth)
+	case "log.http":
+		app.logItem(w, requestPayload.Log)
 	case "log":
 		app.logItemViaRPC(w, requestPayload.Log)
+	case "log.rabbit":
+		app.logEventViaRabbit(w, requestPayload.Log)
 	case "mail":
 		app.sendMail(w, requestPayload.Mail)
 	default:
-		app.errorJSON(w, errors.New("unknown action"))
+		if err := app.errorJSON(w, errors.New("unknown action")); err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -84,7 +96,10 @@ func (app *Config) logItem(w http.ResponseWriter, entry LogPayload) {
 
 	request, err := http.NewRequest("POST", logServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -94,13 +109,24 @@ func (app *Config) logItem(w http.ResponseWriter, entry LogPayload) {
 
 	response, err := client.Do(request)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
-	defer response.Body.Close()
+
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Println("Error closing response body", err)
+		}
+	}()
 
 	if response.StatusCode != http.StatusAccepted {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -108,7 +134,9 @@ func (app *Config) logItem(w http.ResponseWriter, entry LogPayload) {
 	payload.Error = false
 	payload.Message = "logged"
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		return
+	}
 
 }
 
@@ -120,28 +148,46 @@ func (app *Config) authenticate(w http.ResponseWriter, a AuthPayload) {
 	// call the service
 	request, err := http.NewRequest("POST", "http://authentication-service/authenticate", bytes.NewBuffer(jsonData))
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
-	defer response.Body.Close()
-
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Println("Error closing response body", err)
+		}
+	}()
 	// make sure we get back the correct status code
 	if response.StatusCode == http.StatusUnauthorized {
-		app.errorJSON(w, errors.New("invalid credentials"))
+		if err := app.errorJSON(w, errors.New("invalid credentials")); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	} else if response.StatusCode != http.StatusBadRequest {
-		app.errorJSON(w, errors.New("bad request"))
+		if err := app.errorJSON(w, errors.New("bad request")); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 
 	} else if response.StatusCode != http.StatusAccepted {
-		app.errorJSON(w, errors.New("error calling auth service"))
+		if err := app.errorJSON(w, errors.New("error calling auth service")); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -151,12 +197,18 @@ func (app *Config) authenticate(w http.ResponseWriter, a AuthPayload) {
 	// decode the json from the auth service
 	err = json.NewDecoder(response.Body).Decode(&jsonFromService)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	if jsonFromService.Error {
-		app.errorJSON(w, err, http.StatusUnauthorized)
+		if err := app.errorJSON(w, err, http.StatusUnauthorized); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -165,7 +217,9 @@ func (app *Config) authenticate(w http.ResponseWriter, a AuthPayload) {
 	payload.Message = "Authenticated!"
 	payload.Data = jsonFromService.Data
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		return
+	}
 }
 
 // sendMail sends email by calling the mail microservice
@@ -178,7 +232,10 @@ func (app *Config) sendMail(w http.ResponseWriter, msg MailPayload) {
 	// post to mail service
 	request, err := http.NewRequest("POST", mailServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -187,14 +244,23 @@ func (app *Config) sendMail(w http.ResponseWriter, msg MailPayload) {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
-	defer response.Body.Close()
-
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Println("Error closing response body", err)
+		}
+	}()
 	// make sure we get back the right status code
 	if response.StatusCode != http.StatusAccepted {
-		app.errorJSON(w, errors.New("error calling mail service"))
+		if err := app.errorJSON(w, errors.New("error calling mail service")); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -203,7 +269,9 @@ func (app *Config) sendMail(w http.ResponseWriter, msg MailPayload) {
 	payload.Error = false
 	payload.Message = "Message sent to " + msg.To
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		return
+	}
 
 }
 
@@ -211,7 +279,10 @@ func (app *Config) sendMail(w http.ResponseWriter, msg MailPayload) {
 func (app *Config) logEventViaRabbit(w http.ResponseWriter, l LogPayload) {
 	err := app.pushToQueue(l.Name, l.Data)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -219,7 +290,9 @@ func (app *Config) logEventViaRabbit(w http.ResponseWriter, l LogPayload) {
 	payload.Error = false
 	payload.Message = "logged via RabbitMQ"
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		return
+	}
 }
 
 // pushToQueue pushes a message into RabbitMQ
@@ -255,7 +328,10 @@ type RPCPayload struct {
 func (app *Config) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
 	client, err := rpc.Dial("tcp", "logger-service:5001")
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -264,7 +340,10 @@ func (app *Config) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
 	var result string
 	err = client.Call("RPCServer.LogInfo", &rpcPayload, &result)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -273,7 +352,9 @@ func (app *Config) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
 		Message: result,
 	}
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		return
+	}
 }
 
 func (app *Config) LogViaGRPC(w http.ResponseWriter, r *http.Request) {
@@ -281,16 +362,27 @@ func (app *Config) LogViaGRPC(w http.ResponseWriter, r *http.Request) {
 
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	conn, err := grpc.NewClient("logger-service:50001", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
-	defer conn.Close()
+
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Println("Error closing connection", err)
+		}
+	}()
 
 	c := logs.NewLogServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -303,7 +395,10 @@ func (app *Config) LogViaGRPC(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
@@ -311,5 +406,7 @@ func (app *Config) LogViaGRPC(w http.ResponseWriter, r *http.Request) {
 	payload.Error = false
 	payload.Message = "logged"
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		return
+	}
 }

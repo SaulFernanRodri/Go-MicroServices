@@ -15,8 +15,11 @@ func (e *Emitter) setup() error {
 	if err != nil {
 		return err
 	}
-
-	defer channel.Close()
+	defer func() {
+		if err := channel.Close(); err != nil {
+			log.Println("Error closing channel", err)
+		}
+	}()
 	return declareExchange(channel)
 }
 
@@ -25,7 +28,11 @@ func (e *Emitter) Push(event string, severity string) error {
 	if err != nil {
 		return err
 	}
-	defer channel.Close()
+	defer func() {
+		if err := channel.Close(); err != nil {
+			log.Println("Error closing channel", err)
+		}
+	}()
 
 	log.Println("Pushing to channel")
 
@@ -36,7 +43,7 @@ func (e *Emitter) Push(event string, severity string) error {
 		false,
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body: []byte(event),
+			Body:        []byte(event),
 		},
 	)
 	if err != nil {

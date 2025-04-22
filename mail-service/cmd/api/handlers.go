@@ -18,28 +18,37 @@ func (app *Config) SendMail(w http.ResponseWriter, r *http.Request) {
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {
 		log.Println(err)
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
-	msg := Message {
-		From: requestPayload.From,
-		To: requestPayload.To,
+	msg := Message{
+		From:    requestPayload.From,
+		To:      requestPayload.To,
 		Subject: requestPayload.Subject,
-		Data: requestPayload.Message,
+		Data:    requestPayload.Message,
 	}
 
 	err = app.Mailer.SendSMTPMessage(msg)
 	if err != nil {
 		log.Println(err)
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
-	payload := jsonResponse {
-		Error: false,
+	payload := jsonResponse{
+		Error:   false,
 		Message: "sent to " + requestPayload.To,
 	}
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusAccepted, payload); err != nil {
+		log.Println(err)
+		return
+	}
 }

@@ -55,7 +55,12 @@ func (u *User) GetAll() ([]*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Println("Error closing rows", err)
+		}
+	}()
 
 	var users []*User
 

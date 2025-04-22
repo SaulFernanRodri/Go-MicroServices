@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -14,20 +15,30 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {
-		app.errorJSON(w, err, http.StatusBadRequest)
+		if err := app.errorJSON(w, err, http.StatusBadRequest); err != nil {
+			log.Println("Error writing JSON response:", err)
+			return
+		}
 		return
 	}
 
 	// validate the user against the database
 	user, err := app.Models.User.GetByEmail(requestPayload.Email)
 	if err != nil {
-		app.errorJSON(w, errors.New("invalid credentials"), http.StatusUnauthorized)
+		if err := app.errorJSON(w, errors.New("invalid credentials"), http.StatusUnauthorized); err != nil {
+			log.Println("Error writing JSON response:", err)
+			return
+		}
+
 		return
 	}
 
 	valid, err := user.PasswordMatches(requestPayload.Password)
 	if err != nil || !valid {
-		app.errorJSON(w, errors.New("invalid credentials"), http.StatusUnauthorized)
+		if err := app.errorJSON(w, errors.New("invalid credentials"), http.StatusUnauthorized); err != nil {
+			log.Println("Error writing JSON response:", err)
+			return
+		}
 		return
 	}
 
@@ -37,5 +48,7 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 		Data:    user,
 	}
 
-	app.writeJSON(w, http.StatusAccepted, payload)
+	if err := app.writeJSON(w, http.StatusOK, payload); err != nil {
+		log.Println("Error writing JSON response:", err)
+	}
 }

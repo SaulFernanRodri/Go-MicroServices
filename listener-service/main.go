@@ -18,7 +18,11 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
-	defer rabbitConn.Close()
+	func() {
+		if err := rabbitConn.Close(); err != nil {
+			log.Println("Error closing connection", err)
+		}
+	}()
 
 	// start listening for messages
 	log.Println("Listening for and consuming RabbitMQ messages...")
@@ -38,7 +42,7 @@ func main() {
 
 func connect() (*amqp.Connection, error) {
 	var counts int64
-	var backOff = 1 * time.Second
+	var backOff time.Duration
 	var connection *amqp.Connection
 
 	// don't continue until rabbit is ready

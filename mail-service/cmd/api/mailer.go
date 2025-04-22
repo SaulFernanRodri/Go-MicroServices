@@ -40,7 +40,7 @@ func (m *Mail) SendSMTPMessage(msg Message) error {
 		msg.FromName = m.FromName
 	}
 
-	data := map[string]any {
+	data := map[string]any{
 		"message": msg.Data,
 	}
 
@@ -91,7 +91,7 @@ func (m *Mail) SendSMTPMessage(msg Message) error {
 		log.Println(err)
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -137,8 +137,8 @@ func (m *Mail) buildPlainTextMessage(msg Message) (string, error) {
 
 func (m *Mail) inlineCSS(s string) (string, error) {
 	options := premailer.Options{
-		RemoveClasses: false,
-		CssToAttributes: false,
+		RemoveClasses:     false,
+		CssToAttributes:   false,
 		KeepBangImportant: true,
 	}
 

@@ -24,7 +24,11 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
-	defer rabbitConn.Close()
+	defer func() {
+		if err := rabbitConn.Close(); err != nil {
+			log.Println("Error closing connection", err)
+		}
+	}()
 
 	app := Config{
 		Rabbit: rabbitConn,
@@ -34,7 +38,7 @@ func main() {
 
 	// define http server
 	srv := &http.Server{
-		Addr: fmt.Sprintf(":%s", webPort),
+		Addr:    fmt.Sprintf(":%s", webPort),
 		Handler: app.routes(),
 	}
 
@@ -47,7 +51,7 @@ func main() {
 
 func connect() (*amqp.Connection, error) {
 	var counts int64
-	var backOff = 1 * time.Second
+	var backOff time.Duration
 	var connection *amqp.Connection
 
 	// don't continue until rabbit is ready

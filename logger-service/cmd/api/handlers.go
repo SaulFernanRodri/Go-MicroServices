@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"log-service/data"
 	"net/http"
 )
@@ -23,14 +24,20 @@ func (app *Config) WriteLog(w http.ResponseWriter, r *http.Request) {
 
 	err := app.Models.LogEntry.Insert(event)
 	if err != nil {
-		app.errorJSON(w, err)
+		if err := app.errorJSON(w, err); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	resp := jsonResponse{
-		Error: false,
+		Error:   false,
 		Message: "logged",
 	}
 
-	app.writeJSON(w, http.StatusAccepted, resp)
+	if err := app.writeJSON(w, http.StatusAccepted, resp); err != nil {
+		log.Println(err)
+		return
+	}
 }
